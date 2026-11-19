@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>나의 스탑워치</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; background: #0b1220; color: #f8fafc; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    main { width: min(100%, 460px); padding: 32px 24px; background: linear-gradient(145deg,#172338,#101827); border: 1px solid #2a3b55; border-radius: 26px; box-shadow: 0 22px 70px #0005; text-align:center; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .status { color: #94a3b8; font-size: 14px; margin-bottom: 22px; }
+    #clock { font-size: clamp(45px, 11vw, 66px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing:-.045em; margin: 26px 0 8px; }
+    .hint { color: #94a3b8; font-size: 12px; margin-bottom: 32px; }
+    .buttons { display: flex; gap: 10px; }
+    button { flex: 1; border: 0; border-radius: 14px; padding: 14px 7px; font-weight: 700; font-size: 15px; cursor: pointer; color: white; background: #334155; }
+    button.primary { background: #3b82f6; }
+    button.primary.pause { background: #f59e0b; color: #111827; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+    .lap-head { display: flex; justify-content: space-between; align-items: center; margin-top: 36px; padding-bottom: 12px; border-bottom: 1px solid #334155; font-size: 14px; }
+    .lap-head span { color: #94a3b8; }
+    #empty { margin: 25px 0 2px; color: #94a3b8; font-size: 13px; }
+    #laps { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; }
+    #laps li { display:flex; justify-content: space-between; gap: 12px; padding: 13px 0; border-bottom: 1px solid #26364c; font-size: 14px; font-variant-numeric: tabular-nums; }
+    #laps li span:first-child { color: #94a3b8; }
+    #laps li strong { color: #93c5fd; margin-right: 15px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>⏱ 나의 스탑워치</h1>
+    <div id="status" class="status" aria-live="polite">준비</div>
+    <div id="clock" role="timer">00:00.00</div>
+    <div class="hint">분 : 초 . 1/100초</div>
+    <div class="buttons">
+      <button id="reset" type="button">초기화</button>
+      <button id="start" type="button" class="primary">시작</button>
+      <button id="lap" type="button" disabled>랩 기록</button>
+    </div>
+    <div class="lap-head"><b>랩타임 기록</b><span id="count">0개 기록</span></div>
+    <p id="empty">시작 후 ‘랩 기록’을 누르면 기록이 표시됩니다.</p>
+    <ol id="laps" aria-label="랩타임 목록"></ol>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const clock = $('clock'), start = $('start'), reset = $('reset'), lap = $('lap');
+    const status = $('status'), count = $('count'), list = $('laps'), empty = $('empty');
+    let running = false, elapsed = 0, startedAt = 0, lastLap = 0, lapCount = 0, raf = null;
+    const current = () => running ? elapsed + performance.now() - startedAt : elapsed;
+    function format(ms) {
+      const cs = Math.floor(ms / 10);
+      return String(Math.floor(cs / 6000)).padStart(2, '0') + ':' +
+        String(Math.floor(cs / 100) % 60).padStart(2, '0') + '.' +
+        String(cs % 100).padStart(2, '0');
+    }
+    function paint() { clock.textContent = format(current()); if (running) raf = requestAnimationFrame(paint); }
+    function update() {
+      start.textContent = running ? '일시정지' : elapsed > 0 ? '계속' : '시작';
+      start.classList.toggle('pause', running);
+      status.textContent = running ? '측정 중' : elapsed > 0 ? '일시정지' : '준비';
+      lap.disabled = !running;
+    }
+    start.addEventListener('click', () => {
+      if (running) { elapsed = current(); running = false; cancelAnimationFrame(raf); }
+      else { startedAt = performance.now(); running = true; }
+      update(); paint();
+    });
+    reset.addEventListener('click', () => {
+      running = false; cancelAnimationFrame(raf); elapsed = 0; lastLap = 0; lapCount = 0;
+      list.replaceChildren(); empty.hidden = false; count.textContent = '0개 기록';
+      update(); paint();
+    });
+    lap.addEventListener('click', () => {
+      if (!running) return;
+      const total = current(), segment = total - lastLap; lastLap = total; lapCount++;
+      const item = document.createElement('li');
+      const label = document.createElement('span'); label.textContent = `랩 ${String(lapCount).padStart(2,'0')}`;
+      const times = document.createElement('span');
+      const split = document.createElement('strong'); split.textContent = format(segment);
+      const cumulative = document.createElement('span'); cumulative.textContent = format(total);
+      times.append(split, cumulative); item.append(label, times); list.prepend(item);
+      empty.hidden = true; count.textContent = `${lapCount}개 기록`;
+    });
+    update(); paint();
+  </script>
+</body>
+</html>
